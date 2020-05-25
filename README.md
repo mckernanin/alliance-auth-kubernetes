@@ -11,6 +11,7 @@
 - This was tested on Digital Ocean's managed kubernetes. You may need to tweak the volume claims on a different provider.
 - Based on using a tagged image of AA, currently `mckernanin/alliance-auth-2.6.5`
 - I have migrations set to run on container start, so that when you update the tag you'll run any migrations automatically
+- You have a database already running (I'm using a managed DB from Digital Ocean)
 
 ## Getting Started
 1. Create namespace for project: `kubectl create namespace alliance-auth-k8s`
@@ -32,3 +33,5 @@ You will need to specify the current running pod in all commands, replacing `%%P
 kubectl scale deployment alliance-auth --replicas=0 && kubectl apply -f app/deployment.yml
 kubectl scale deployment alliance-auth --replicas=1
 ```
+
+If you want to try a cluster on DigitalOcean, you can use this link to receive $100 in free credit: https://m.do.co/c/5cbe77612248
