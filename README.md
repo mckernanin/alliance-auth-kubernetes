@@ -23,7 +23,7 @@ You will need to specify the current running pod in all commands, replacing `%%P
 - NGINX Logs: `kubectl logs -f %%POD%% nginx`
 - Exec (SSH) into running container: `kubectl exec -it %%POD%% -- bash`
 
-### Installing packages / etc
+## Installing packages / etc
 - You can add commands to the command section of the AA container config to install packages, disable running migrations on start, etc.
 - You can install packages in the running container by exec, but keep in mind that they will not persist if the container is restarted.
 - To deploy a new config, edit the configmap in `deployment.yml` and then restart the container. Just applying a new config will not restart things, I use a script like this:
