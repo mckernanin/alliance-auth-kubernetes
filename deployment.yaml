@@ -1,0 +1,175 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  namespace: alliance-auth-k8s
+  name: alliance-auth
+  labels:
+    app: alliance-auth
+
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: alliance-auth
+  template:
+    metadata:
+      labels:
+        app: alliance-auth
+    spec:
+      containers:
+        - name: alliance-auth
+          image: mckernanin/alliance-auth:2.6.5
+          command: ["/bin/bash", "-c"]
+          args:
+            - python manage.py makemigrations;
+              python manage.py migrate;
+              python manage.py collectstatic --noinput;
+              /usr/bin/supervisord;
+          ports:
+            - name: auth-1
+              containerPort: 5555
+            - name: auth-2
+              containerPort: 8000
+          volumeMounts:
+            - name: auth-config
+              mountPath: /home/allianceserver/myauth/myauth/settings/local.py
+              subPath: local.py
+            - name: auth-static-pvc
+              mountPath: /var/www/myauth/static
+        - name: nginx
+          image: nginx:1.15.5
+          ports:
+            - name: auth-static-web
+              containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+            - name: auth-static-pvc
+              mountPath: /var/www/myauth/static
+      volumes:
+        - name: auth-config
+          configMap:
+            name: auth-configmap
+        - name: nginx-config
+          configMap:
+            name: nginx-configmap
+        - name: auth-static-pvc
+          persistentVolumeClaim:
+            claimName: auth-static-pvc
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: alliance-auth-k8s
+spec:
+  serviceName: redis-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:3
+          ports:
+            - containerPort: 6379
+              name: redis-port
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: auth-configmap
+  namespace: alliance-auth-k8s
+data:
+  local.py: |
+    # Every setting in base.py can be overloaded by redefining it here.
+    from .base import *
+
+    # Django App Secretkey change if you want
+    SECRET_KEY = 'changeme'
+
+    # Change this to change the name of the auth site
+    SITE_NAME = 'Alliance Auth'
+
+    # DEBUG = True
+    # Add any additional apps to this list. Pre-Populated with some Apps
+    INSTALLED_APPS += [
+    ]
+
+    #### ADD YOUR OWN LOCAL DATABASE DETAILS HERE
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'aauth',
+        'USER': 'aauth',
+        'PASSWORD': 'PASSWORD',
+        'HOST': '127.0.0.1',
+        'PORT': '3306',
+    }
+
+
+
+    ESI_SSO_CLIENT_ID = ''
+    ESI_SSO_CLIENT_SECRET = ''
+    ESI_SSO_CALLBACK_URL = 'https://yourauthurl/sso/callback'
+
+
+    REGISTRATION_VERIFY_EMAIL = False
+    EMAIL_HOST = ''
+    EMAIL_PORT = 587
+    EMAIL_HOST_USER = ''
+    EMAIL_HOST_PASSWORD = ''
+    EMAIL_USE_TLS = True
+    DEFAULT_FROM_EMAIL = ''
+    #######################################
+    # Add any custom settings below here. #
+    #######################################
+
+    ROOT_URLCONF = 'myauth.urls'
+    WSGI_APPLICATION = 'myauth.wsgi.application'
+    STATIC_ROOT = "/var/www/myauth/static/"
+    BROKER_URL = 'redis://alliance-auth-k8s-redis:6379/0'
+    CELERY_RESULT_BACKEND = 'redis://alliance-auth-k8s-redis:6379/0'
+    CACHES = {
+        "default": {
+            "BACKEND": "redis_cache.RedisCache",
+            "LOCATION": "alliance-auth-k8s-redis:6379",
+            "OPTIONS": {
+                "DB": 1,
+            }
+        }
+    }
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: nginx-configmap
+  namespace: alliance-auth-k8s
+data:
+  default.conf: |
+    server {
+      listen 80;
+      location = /favicon.ico { access_log off; log_not_found off; }
+      location /static {
+          alias /var/www/myauth/static;
+          autoindex off;
+      }
+
+      # Gunicorn config goes below
+      location / {
+          proxy_pass http://alliance-auth-k8s:8000;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header Host $host;
+          proxy_set_header  X-Real-IP   $remote_addr;
+          #proxy_set_header  X-Forwarded-For   $proxy_add_x_forwarded_for;
+          proxy_redirect off;
+      }
+    }

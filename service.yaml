@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: alliance-auth-k8s
+  namespace: alliance-auth-k8s
+spec:
+  selector:
+    app: alliance-auth
+  ports:
+    - name: auth-static-web
+      port: 80
+      targetPort: 80
+    - name: auth-2
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alliance-auth-k8s-redis
+  namespace: alliance-auth-k8s
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: alliance-auth-k8s-ing
+  namespace: alliance-auth-k8s
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`yoururl.com`)
+      kind: Rule
+      services:
+        - name: alliance-auth-k8s
+          port: 80
+  tls:
+    certResolver: myresolver
