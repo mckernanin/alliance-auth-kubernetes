@@ -7,7 +7,7 @@
   - Nginx (static assets)
 
 ## Assumptions / Notes
-- You already have ingress setup in your cluster (I'm using Traefik 2.1, modify/create ingress as needed to expose app to users)
+- You already have ingress setup in your cluster (I'm using Traefik 2.2, modify/create ingress as needed to expose app to users)
 - This was tested on Digital Ocean's managed kubernetes. You may need to tweak the volume claims on a different provider.
 - Based on using a tagged image of AA, currently `mckernanin/alliance-auth-2.6.5`
 - I have migrations set to run on container start, so that when you update the tag you'll run any migrations automatically
